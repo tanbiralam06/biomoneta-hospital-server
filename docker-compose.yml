@@ -1,0 +1,32 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: biomoneta-timescaledb
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=biomoneta_air
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ../Biomoneta-air/db/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+
+  backend:
+    build: .
+    container_name: biomoneta-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=biomoneta_air
+    depends_on:
+      - timescaledb
+
+volumes:
+  timescale_data:
