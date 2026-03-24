@@ -58,104 +58,102 @@ async def ingest_sensor_data(
     para_ix: float = 0,
     para_x: float = 0,
 ):
-    print(f"📥 Received {device_type} data for {room_id}:")
-    print(f"   CO2={para_i}, T={para_ii}, H={para_iii}")
-    print(f"   PM1={para_v}, PM2.5={para_vi}, PM4={para_vii}, PM10={para_viii}")
-    print(f"   VOC={para_ix}, NOx={para_x}")
-    pool = await get_pool()
+    try:
+        print(f"📥 Received {device_type} data for {room_id}:")
+        print(f"   CO2={para_i}, T={para_ii}, H={para_iii}")
+        print(f"   PM1={para_v}, PM2.5={para_vi}, PM4={para_vii}, PM10={para_viii}")
+        print(f"   VOC={para_ix}, NOx={para_x}")
+        pool = await get_pool()
 
-    # 1. Store the raw reading
-    insert_query = """
-        INSERT INTO readings (
-            time, room_id, device_type, co2, temperature, humidity,
-            pm1_0, pm2_5, pm4_0, pm10_0, voc_index, nox_index
-        ) VALUES (
-            NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+        # 1. Store the raw reading
+        insert_query = """
+            INSERT INTO readings (
+                time, room_id, device_type, co2, temperature, humidity,
+                pm1_0, pm2_5, pm4_0, pm10_0, voc_index, nox_index
+            ) VALUES (
+                NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+            )
+        """
+        await pool.execute(
+            insert_query,
+            room_id, device_type,
+            para_i, para_ii, para_iii,
+            para_v, para_vi, para_vii, para_viii,
+            para_ix, para_x,
         )
-    """
-    await pool.execute(
-        insert_query,
-        room_id, device_type,
-        para_i, para_ii, para_iii,
-        para_v, para_vi, para_vii, para_viii,
-        para_ix, para_x,
-    )
 
-    # 2. Attempt IN/OUT correlation for bacteria prediction
-    opposite_type = "OUT" if device_type == "IN" else "IN"
-    correlation_query = """
-        SELECT co2, temperature, humidity, pm1_0, pm4_0, voc_index, nox_index
-        FROM readings
-        WHERE room_id = $1
-          AND device_type = $2
-          AND time > NOW() - INTERVAL '5 minutes'
-        ORDER BY time DESC
-        LIMIT 1
-    """
-    opposite_row = await pool.fetchrow(correlation_query, room_id, opposite_type)
-
-    bacteria_count = None
-    if opposite_row is not None:
-        # Determine which reading is IN and which is OUT
-        if device_type == "IN":
-            in_data = {
-                "co2": para_i, "temp": para_ii, "hum": para_iii,
-                "pm1": para_v, "pm4": para_vii,
-                "voc": para_ix, "nox": para_x,
-            }
-            out_data = {
-                "pm1": opposite_row["pm1_0"], "pm4": opposite_row["pm4_0"],
-            }
-        else:
-            in_data = {
-                "co2": opposite_row["co2"], "temp": opposite_row["temperature"],
-                "hum": opposite_row["humidity"],
-                "pm1": opposite_row["pm1_0"], "pm4": opposite_row["pm4_0"],
-                "voc": opposite_row["voc_index"], "nox": opposite_row["nox_index"],
-            }
-            out_data = {"pm1": para_v, "pm4": para_vii}
-
-        # Calculate bacteria_mass = (pm4_in - pm1_in) - (pm4_out - pm1_out)
-        bacteria_mass = (in_data["pm4"] - in_data["pm1"]) - (out_data["pm4"] - out_data["pm1"])
-
-        # Model expects: [CO2, Temperature, Humidity, Bacteria_Mass, VOC, NOx]
-        features = np.array([[
-            in_data["co2"], in_data["temp"], in_data["hum"],
-            bacteria_mass,
-            in_data["voc"], in_data["nox"],
-        ]])
-
-        bacteria_count = float(model.predict(features)[0])
-
-        # Update the most recent IN reading with the prediction
-        update_query = """
-            UPDATE readings
-            SET bacteria_count = $1
-            WHERE room_id = $2
-              AND device_type = 'IN'
+        # 2. Attempt IN/OUT correlation for bacteria prediction
+        opposite_type = "OUT" if device_type == "IN" else "IN"
+        correlation_query = """
+            SELECT co2, temperature, humidity, pm1_0, pm4_0, voc_index, nox_index
+            FROM readings
+            WHERE room_id = $1
+              AND device_type = $2
               AND time > NOW() - INTERVAL '5 minutes'
             ORDER BY time DESC
             LIMIT 1
         """
-        # asyncpg doesn't support UPDATE...ORDER BY...LIMIT, use a subquery
-        update_query = """
-            UPDATE readings
-            SET bacteria_count = $1
-            WHERE ctid = (
-                SELECT ctid FROM readings
-                WHERE room_id = $2 AND device_type = 'IN'
-                  AND time > NOW() - INTERVAL '5 minutes'
-                ORDER BY time DESC
-                LIMIT 1
-            )
-        """
-        await pool.execute(update_query, bacteria_count, room_id)
+        opposite_row = await pool.fetchrow(correlation_query, room_id, opposite_type)
 
-    return {
-        "success": True,
-        "message": "Data logged successfully",
-        "bacteria_count": bacteria_count,
-    }
+        bacteria_count = None
+        if opposite_row is not None:
+            # Determine which reading is IN and which is OUT
+            if device_type == "IN":
+                in_data = {
+                    "co2": para_i, "temp": para_ii, "hum": para_iii,
+                    "pm1": para_v, "pm4": para_vii,
+                    "voc": para_ix, "nox": para_x,
+                }
+                out_data = {
+                    "pm1": opposite_row["pm1_0"], "pm4": opposite_row["pm4_0"],
+                }
+            else:
+                in_data = {
+                    "co2": opposite_row["co2"], "temp": opposite_row["temperature"],
+                    "hum": opposite_row["humidity"],
+                    "pm1": opposite_row["pm1_0"], "pm4": opposite_row["pm4_0"],
+                    "voc": opposite_row["voc_index"], "nox": opposite_row["nox_index"],
+                }
+                out_data = {"pm1": para_v, "pm4": para_vii}
+
+            # Calculate bacteria_mass = (pm4_in - pm1_in) - (pm4_out - pm1_out)
+            bacteria_mass = (in_data["pm4"] - in_data["pm1"]) - (out_data["pm4"] - out_data["pm1"])
+
+            # Model expects: [CO2, Temperature, Humidity, Bacteria_Mass, VOC, NOx]
+            features = np.array([[
+                in_data["co2"], in_data["temp"], in_data["hum"],
+                bacteria_mass,
+                in_data["voc"], in_data["nox"],
+            ]])
+
+            if model:
+                bacteria_count = float(model.predict(features)[0])
+
+                # Update the most recent IN reading with the prediction
+                update_query = """
+                    UPDATE readings
+                    SET bacteria_count = $1
+                    WHERE ctid = (
+                        SELECT ctid FROM readings
+                        WHERE room_id = $2 AND device_type = 'IN'
+                          AND time > NOW() - INTERVAL '5 minutes'
+                        ORDER BY time DESC
+                        LIMIT 1
+                    )
+                """
+                await pool.execute(update_query, bacteria_count, room_id)
+
+        return {
+            "success": True,
+            "message": "Data logged successfully",
+            "bacteria_count": bacteria_count,
+        }
+    except Exception as e:
+        print(f"❌ Error during ingestion: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Server Error: {str(e)}"
+        }
 
 
 # ---------------------------------------------------------------------------
