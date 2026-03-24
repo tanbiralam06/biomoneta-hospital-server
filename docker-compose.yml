@@ -18,7 +18,7 @@ services:
     container_name: biomoneta-backend
     restart: always
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       - DB_HOST=timescaledb
       - DB_PORT=5432
