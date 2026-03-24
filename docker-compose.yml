@@ -11,7 +11,7 @@ services:
       - "5433:5432"
     volumes:
       - timescale_data:/var/lib/postgresql/data
-      - ../Biomoneta-air/db/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./db/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
 
   backend:
     build: .
@@ -21,7 +21,7 @@ services:
       - "8000:8000"
     environment:
       - DB_HOST=timescaledb
-      - DB_PORT=5433
+      - DB_PORT=5432
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - DB_NAME=biomoneta_air
