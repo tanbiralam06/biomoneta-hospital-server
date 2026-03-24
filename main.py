@@ -166,7 +166,7 @@ async def get_room_history(room_id: str):
 
     query = """
         SELECT
-            time_bucket('5 minutes', time) AS bucket,
+            time_bucket('5 minutes', time) AT TIME ZONE 'Asia/Kolkata' AS bucket,
             AVG(co2) AS co2,
             AVG(temperature) AS temperature,
             AVG(humidity) AS humidity,
