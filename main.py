@@ -58,7 +58,10 @@ async def ingest_sensor_data(
     para_ix: float = 0,
     para_x: float = 0,
 ):
-    print(f"📥 Received {device_type} data for {room_id}")
+    print(f"📥 Received {device_type} data for {room_id}:")
+    print(f"   CO2={para_i}, T={para_ii}, H={para_iii}")
+    print(f"   PM1={para_v}, PM2.5={para_vi}, PM4={para_vii}, PM10={para_viii}")
+    print(f"   VOC={para_ix}, NOx={para_x}")
     pool = await get_pool()
 
     # 1. Store the raw reading
@@ -169,8 +172,12 @@ async def get_room_history(room_id: str):
             AVG(co2) AS co2,
             AVG(temperature) AS temperature,
             AVG(humidity) AS humidity,
+            AVG(pm1_0) AS pm1_0,
             AVG(pm2_5) AS pm2_5,
+            AVG(pm4_0) AS pm4_0,
             AVG(pm10_0) AS pm10_0,
+            AVG(voc_index) AS voc_index,
+            AVG(nox_index) AS nox_index,
             AVG(bacteria_count) AS bacteria_count
         FROM readings
         WHERE room_id = $1
@@ -191,8 +198,12 @@ async def get_room_history(room_id: str):
                 "co2": row["co2"],
                 "temperature": row["temperature"],
                 "humidity": row["humidity"],
+                "pm1_0": row["pm1_0"],
                 "pm2_5": row["pm2_5"],
+                "pm4_0": row["pm4_0"],
                 "pm10_0": row["pm10_0"],
+                "voc_index": row["voc_index"],
+                "nox_index": row["nox_index"],
                 "bacteria_count": row["bacteria_count"],
             },
         }
