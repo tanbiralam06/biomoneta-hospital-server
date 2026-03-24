@@ -190,8 +190,8 @@ async def get_room_history(room_id: str):
     formatted = [
         {
             "time": row["bucket"].strftime("%-I:%M %p"),
-            "value": round(row["pm2_5"] or 0),
-            "bacteria_count": round(row["bacteria_count"] or 0, 2) if row["bacteria_count"] else None,
+            "value": round(row["bacteria_count"] or 0, 2) if row["bacteria_count"] is not None else round(row["pm2_5"] or 0),
+            "bacteria_count": round(row["bacteria_count"] or 0, 2) if row["bacteria_count"] is not None else None,
             "fullData": {
                 "co2": row["co2"],
                 "temperature": row["temperature"],
