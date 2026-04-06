@@ -9,7 +9,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+import math
 from database import get_pool, close_pool
+
+def sanitize_float(val):
+    """Ensure float values are JSON compliant (not NaN or Inf)."""
+    try:
+        if val is None or math.isnan(val) or math.isinf(val):
+            return None
+        return float(val)
+    except (TypeError, ValueError):
+        return None
 
 # ---------------------------------------------------------------------------
 # Model loading at startup
@@ -238,25 +248,30 @@ async def get_room_history(
         """
         rows = await pool.fetch(query, room_id, device_type)
 
-    formatted = [
-        {
+    formatted = []
+    for row in rows:
+        bc = sanitize_float(row["bacteria_count"])
+        pm = sanitize_float(row["pm2_5"])
+        
+        # Determine the primary 'value' (Bacteria Count > PM2.5)
+        display_val = round(bc, 2) if bc is not None else (round(pm) if pm is not None else 0)
+        
+        formatted.append({
             "time": row["bucket"].strftime("%-I:%M:%S %p") if resolution == "raw" else row["bucket"].strftime("%-I:%M %p"),
-            "value": round(row["bacteria_count"] or 0, 2) if row["bacteria_count"] is not None else round(row["pm2_5"] or 0),
-            "bacteria_count": round(row["bacteria_count"] or 0, 2) if row["bacteria_count"] is not None else None,
+            "value": display_val,
+            "bacteria_count": round(bc, 2) if bc is not None else None,
             "fullData": {
-                "co2": row["co2"],
-                "temperature": row["temperature"],
-                "humidity": row["humidity"],
-                "pm1_0": row["pm1_0"],
-                "pm2_5": row["pm2_5"],
-                "pm4_0": row["pm4_0"],
-                "pm10_0": row["pm10_0"],
-                "voc_index": row["voc_index"],
-                "nox_index": row["nox_index"],
-                "bacteria_count": row["bacteria_count"],
+                "co2": sanitize_float(row["co2"]),
+                "temperature": sanitize_float(row["temperature"]),
+                "humidity": sanitize_float(row["humidity"]),
+                "pm1_0": sanitize_float(row["pm1_0"]),
+                "pm2_5": pm,
+                "pm4_0": sanitize_float(row["pm4_0"]),
+                "pm10_0": sanitize_float(row["pm10_0"]),
+                "voc_index": sanitize_float(row["voc_index"]),
+                "nox_index": sanitize_float(row["nox_index"]),
+                "bacteria_count": bc,
             },
-        }
-        for row in rows
-    ]
+        })
 
     return formatted
