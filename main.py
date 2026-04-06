@@ -1,6 +1,8 @@
 import os
 import joblib
 import numpy as np
+import asyncpg
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query, HTTPException
