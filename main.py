@@ -1,6 +1,7 @@
 import os
 import joblib
 import numpy as np
+import pandas as pd
 import asyncpg
 import asyncio
 from contextlib import asynccontextmanager
@@ -143,10 +144,13 @@ async def ingest_sensor_data(
                     out_data = {"pm1": para_v, "pm4": para_vii}
 
                 bacteria_mass = (in_data["pm4"] - in_data["pm1"]) - (out_data["pm4"] - out_data["pm1"])
-                features = np.array([[
-                    in_data["co2"], in_data["temp"], in_data["hum"],
-                    bacteria_mass, in_data["voc"], in_data["nox"],
-                ]])
+                features = pd.DataFrame(
+                    [[
+                        in_data["co2"], in_data["temp"], in_data["hum"],
+                        bacteria_mass, in_data["voc"], in_data["nox"],
+                    ]],
+                    columns=['P1_CO2', 'P1_Temperature', 'P1_Humidity', 'Bacteria_Mass', 'P1_VOC', 'P1_Nox']
+                )
 
                 if model:
                     bacteria_count = float(model.predict(features)[0])
