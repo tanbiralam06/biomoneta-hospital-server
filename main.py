@@ -191,36 +191,56 @@ async def ingest_sensor_data(
 # GET /api/rooms/{room_id}/history  — dashboard data
 # ---------------------------------------------------------------------------
 @app.get("/api/rooms/{room_id}/history")
-async def get_room_history(room_id: str):
-    """Fetch last 24 hours of data aggregated by 5-minute intervals."""
+async def get_room_history(
+    room_id: str,
+    resolution: str = Query("summary", enum=["summary", "raw"]),
+    device_type: str = Query("IN", enum=["IN", "OUT"])
+):
+    """Fetch last 24 hours of data. Supports 5-minute summary or 15s raw data."""
     pool = await get_pool()
 
-    query = """
-        SELECT
-            time_bucket('5 minutes', time) AT TIME ZONE 'Asia/Kolkata' AS bucket,
-            AVG(co2) AS co2,
-            AVG(temperature) AS temperature,
-            AVG(humidity) AS humidity,
-            AVG(pm1_0) AS pm1_0,
-            AVG(pm2_5) AS pm2_5,
-            AVG(pm4_0) AS pm4_0,
-            AVG(pm10_0) AS pm10_0,
-            AVG(voc_index) AS voc_index,
-            AVG(nox_index) AS nox_index,
-            AVG(bacteria_count) AS bacteria_count
-        FROM readings
-        WHERE room_id = $1
-          AND device_type = 'IN'
-          AND time > NOW() - INTERVAL '24 hours'
-        GROUP BY bucket
-        ORDER BY bucket ASC
-    """
-
-    rows = await pool.fetch(query, room_id)
+    if resolution == "raw":
+        # Raw data (no aggregation)
+        query = """
+            SELECT
+                time AT TIME ZONE 'Asia/Kolkata' AS bucket,
+                co2, temperature, humidity,
+                pm1_0, pm2_5, pm4_0, pm10_0,
+                voc_index, nox_index, bacteria_count
+            FROM readings
+            WHERE room_id = $1
+              AND device_type = $2
+              AND time > NOW() - INTERVAL '24 hours'
+            ORDER BY bucket ASC
+        """
+        rows = await pool.fetch(query, room_id, device_type)
+    else:
+        # Summary data (5-minute aggregation)
+        query = """
+            SELECT
+                time_bucket('5 minutes', time) AT TIME ZONE 'Asia/Kolkata' AS bucket,
+                AVG(co2) AS co2,
+                AVG(temperature) AS temperature,
+                AVG(humidity) AS humidity,
+                AVG(pm1_0) AS pm1_0,
+                AVG(pm2_5) AS pm2_5,
+                AVG(pm4_0) AS pm4_0,
+                AVG(pm10_0) AS pm10_0,
+                AVG(voc_index) AS voc_index,
+                AVG(nox_index) AS nox_index,
+                AVG(bacteria_count) AS bacteria_count
+            FROM readings
+            WHERE room_id = $1
+              AND device_type = $2
+              AND time > NOW() - INTERVAL '24 hours'
+            GROUP BY bucket
+            ORDER BY bucket ASC
+        """
+        rows = await pool.fetch(query, room_id, device_type)
 
     formatted = [
         {
-            "time": row["bucket"].strftime("%-I:%M %p"),
+            "time": row["bucket"].strftime("%-I:%M:%S %p") if resolution == "raw" else row["bucket"].strftime("%-I:%M %p"),
             "value": round(row["bacteria_count"] or 0, 2) if row["bacteria_count"] is not None else round(row["pm2_5"] or 0),
             "bacteria_count": round(row["bacteria_count"] or 0, 2) if row["bacteria_count"] is not None else None,
             "fullData": {
