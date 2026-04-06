@@ -1,17 +1,24 @@
+version: "3.9"
+
 services:
   timescaledb:
     image: timescale/timescaledb:latest-pg16
     container_name: biomoneta-timescaledb
     restart: always
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=biomoneta_air
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: biomoneta_air
     ports:
       - "5433:5432"
     volumes:
       - timescale_data:/var/lib/postgresql/data
       - ./db/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   backend:
     build: .
@@ -20,13 +27,14 @@ services:
     ports:
       - "8001:8000"
     environment:
-      - DB_HOST=timescaledb
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_NAME=biomoneta_air
+      DB_HOST: timescaledb
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: biomoneta_air
     depends_on:
-      - timescaledb
+      timescaledb:
+        condition: service_healthy
 
 volumes:
   timescale_data:

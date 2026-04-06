@@ -1,5 +1,6 @@
 import os
 import asyncpg
+import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,11 +16,39 @@ DATABASE_CONFIG = {
 pool: asyncpg.Pool | None = None
 
 
+async def create_pool_with_retry() -> asyncpg.Pool:
+    """Create DB pool with retry logic (critical for Docker startup)."""
+    retries = 10
+    delay = 2
+
+    for attempt in range(retries):
+        try:
+            print(f"🔄 Connecting to DB (attempt {attempt + 1})...")
+            pool = await asyncpg.create_pool(
+                **DATABASE_CONFIG,
+                min_size=1,
+                max_size=10,
+                command_timeout=60,
+            )
+            print("✅ Database pool created")
+            return pool
+
+        except Exception as e:
+            print(f"❌ DB connection failed: {e}")
+            if attempt < retries - 1:
+                print(f"⏳ Retrying in {delay}s...")
+                await asyncio.sleep(delay)
+            else:
+                raise Exception("🚨 Could not connect to DB after multiple attempts")
+
+
 async def get_pool() -> asyncpg.Pool:
-    """Return the existing connection pool or create a new one."""
+    """Get or recreate pool safely."""
     global pool
+
     if pool is None:
-        pool = await asyncpg.create_pool(**DATABASE_CONFIG)
+        pool = await create_pool_with_retry()
+
     return pool
 
 
