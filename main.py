@@ -20,21 +20,24 @@ model = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load the ML model and DB pool on startup; clean up on shutdown."""
+    print("🚀 Startup: Lifecycle handler initiated...", flush=True)
     global model
     try:
+        print(f"📦 Loading ML model from {MODEL_PATH}...", flush=True)
         model = joblib.load(MODEL_PATH)
-        print(f"✅ Zebox model loaded from {MODEL_PATH}")
+        print(f"✅ Zebox model loaded from {MODEL_PATH}", flush=True)
     except Exception as e:
-        print(f"⚠️  ML Model load failed: {e}. Some features may be disabled.")
+        print(f"⚠️  ML Model load failed: {e}. Some features may be disabled.", flush=True)
 
     # Critical: Wait for DB to be truly ready before starting
     try:
+        print("🗄️ Initializing database connection pool...", flush=True)
         pool = await get_pool()
         async with pool.acquire() as conn:
             await conn.execute("SELECT 1")
-        print("✅ Database pool created and verified")
+        print("✅ Database pool created and verified", flush=True)
     except Exception as e:
-        print(f"🚨 CRITICAL: Database startup failed: {e}")
+        print(f"🚨 CRITICAL: Database startup failed: {e}", flush=True)
         # We don't crash the server here to allow health checks to report failure
         
     yield
