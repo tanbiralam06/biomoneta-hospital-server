@@ -229,16 +229,16 @@ async def get_room_history(
         query = """
             SELECT
                 time_bucket('5 minutes', time) AT TIME ZONE 'Asia/Kolkata' AS bucket,
-                AVG(co2) AS co2,
-                AVG(temperature) AS temperature,
-                AVG(humidity) AS humidity,
-                AVG(pm1_0) AS pm1_0,
-                AVG(pm2_5) AS pm2_5,
-                AVG(pm4_0) AS pm4_0,
-                AVG(pm10_0) AS pm10_0,
-                AVG(voc_index) AS voc_index,
-                AVG(nox_index) AS nox_index,
-                AVG(bacteria_count) AS bacteria_count
+                AVG(NULLIF(co2, 0)) AS co2,
+                AVG(NULLIF(temperature, 0)) AS temperature,
+                AVG(NULLIF(humidity, 0)) AS humidity,
+                AVG(NULLIF(pm1_0, 0)) AS pm1_0,
+                AVG(NULLIF(pm2_5, 0)) AS pm2_5,
+                AVG(NULLIF(pm4_0, 0)) AS pm4_0,
+                AVG(NULLIF(pm10_0, 0)) AS pm10_0,
+                AVG(NULLIF(voc_index, 0)) AS voc_index,
+                AVG(NULLIF(nox_index, 0)) AS nox_index,
+                AVG(NULLIF(bacteria_count, 0)) AS bacteria_count
             FROM readings
             WHERE room_id = $1
               AND device_type = $2
