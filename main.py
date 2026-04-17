@@ -97,6 +97,8 @@ async def ingest_sensor_data(
     para_viii: float = 0,
     para_ix: float = 0,
     para_x: float = 0,
+    tvoc_ppb: float = 0,
+    tvoc_ppm: float = 0,
 ):
     max_retries = 2
     for attempt in range(max_retries):
@@ -108,9 +110,10 @@ async def ingest_sensor_data(
             insert_query = """
                 INSERT INTO readings (
                     time, room_id, device_type, co2, temperature, humidity,
-                    pm1_0, pm2_5, pm4_0, pm10_0, voc_index, nox_index
+                    pm1_0, pm2_5, pm4_0, pm10_0, voc_index, nox_index,
+                    tvoc_ppb, tvoc_ppm
                 ) VALUES (
-                    NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+                    NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
                 )
             """
             await pool.execute(
@@ -119,6 +122,7 @@ async def ingest_sensor_data(
                 para_i, para_ii, para_iii,
                 para_v, para_vi, para_vii, para_viii,
                 para_ix, para_x,
+                tvoc_ppb, tvoc_ppm,
             )
 
             # 2. Attempt IN/OUT correlation for bacteria prediction
@@ -216,7 +220,8 @@ async def get_room_history(
                 time AT TIME ZONE 'Asia/Kolkata' AS bucket,
                 co2, temperature, humidity,
                 pm1_0, pm2_5, pm4_0, pm10_0,
-                voc_index, nox_index, bacteria_count
+                voc_index, nox_index, bacteria_count,
+                tvoc_ppb, tvoc_ppm
             FROM readings
             WHERE room_id = $1
               AND device_type = $2
@@ -238,7 +243,9 @@ async def get_room_history(
                 AVG(NULLIF(pm10_0, 0)) AS pm10_0,
                 AVG(NULLIF(voc_index, 0)) AS voc_index,
                 AVG(NULLIF(nox_index, 0)) AS nox_index,
-                AVG(NULLIF(bacteria_count, 0)) AS bacteria_count
+                AVG(NULLIF(bacteria_count, 0)) AS bacteria_count,
+                AVG(NULLIF(tvoc_ppb, 0)) AS tvoc_ppb,
+                AVG(NULLIF(tvoc_ppm, 0)) AS tvoc_ppm
             FROM readings
             WHERE room_id = $1
               AND device_type = $2
@@ -271,6 +278,8 @@ async def get_room_history(
                 "voc_index": sanitize_float(row["voc_index"]),
                 "nox_index": sanitize_float(row["nox_index"]),
                 "bacteria_count": bc,
+                "tvoc_ppb": sanitize_float(row["tvoc_ppb"]),
+                "tvoc_ppm": sanitize_float(row["tvoc_ppm"]),
             },
         })
 
