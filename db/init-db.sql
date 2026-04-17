@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS readings (
     
     voc_index DOUBLE PRECISION,     -- para_ix
     nox_index DOUBLE PRECISION,     -- para_x
+    tvoc_ppb DOUBLE PRECISION,      -- new sensor
+    tvoc_ppm DOUBLE PRECISION,      -- new sensor
 
     bacteria_count DOUBLE PRECISION -- predicted CFU/m³ from ML model
 );
